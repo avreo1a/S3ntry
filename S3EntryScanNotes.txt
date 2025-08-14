@@ -1,0 +1,7 @@
+s3:ListAllMyBuckets -- List Every Bucket Available
+s3:GetBucketAcl --Gives the Buckets Access Control List
+s3:GetBucketPolicy -- Gets the JSON Bucket Policy
+s3:GetBucketPolicyStatus --Return whether AWS Thinks said bucket is public AKA TEA APP
+s3:GetBucketPublicAccessBlock -- Flags buckets that don’t have full block enabled.
+s3:GetBucketLocation -- Useful for reporting and API calls that need region.
+s3:GetEncryptionConfiguration -- Flags buckets that store data unencrypted at rest.
