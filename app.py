@@ -1,4 +1,5 @@
 import boto3, os, logging, requests, json
+from notify.AmazonSNS import SNSNotifier
 
 
 def scan_s3():
@@ -83,16 +84,24 @@ def scan_s3():
 
 
 def lambda_handler(event, context):
-  
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    
     findings = scan_s3()
-
     
     if findings:
-        #dump in findings and as json for CloduWatch
+        # Print findings for CloudWatch logs
         print(json.dumps(findings, indent=2))
+        
+        # Send SNS notification for risky buckets
+        try:
+            notifier = SNSNotifier()
+            notifier.send_alert(findings)
+            print(f"SNS alert sent for {len(findings)} risky bucket(s)")
+        except Exception as e:
+            logging.error(f"Failed to send SNS notification: {e}")
+            # Don't fail the entire function if notification fails
     else:
-      
         print("No risky buckets found.")
-
    
     return {"findings": findings}
