@@ -55,7 +55,7 @@ def scan_s3():
         encrypted = True  
         try:
             # Fetch the default encryption configuration for the bucket
-            enc = s3.get_bucket_encryption(Bucket=name)
+            enc = s3.get_bucket_encryption(Bucket=bucket)
 
             encrypted = bool(enc["ServerSideEncryptionConfiguration"]["Rules"])
         except s3.exceptions.ServerSideEncryptionConfigurationNotFoundError:
@@ -71,7 +71,7 @@ def scan_s3():
         # If Block Public Access is missing OR policy is public OR encryption is missing:
         if (not blocked) or star_get or (not encrypted):
             findings.append({
-                "bucket": name,                      # Name of the bucket
+                "bucket": bucket,                      # Name of the bucket
                 "public_access_block": blocked,       # True if Block Public Access is on
                 "public_policy": star_get,            # True if bucket policy is public
                 "encrypted": encrypted                # True if default encryption is enabled
