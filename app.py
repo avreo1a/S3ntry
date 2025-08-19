@@ -9,6 +9,7 @@ def scan_s3():
     findings = []
 
 
+
     # -- Check if the Bucket has Public Access Block enabled --
     for bucket in buckets:
         #Lets just assume Public Access Block is NOT enabled
