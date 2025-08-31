@@ -1,0 +1,25 @@
+Creates an ECR repo for your image
+
+Creates IAM role + policies (Lambda basic logs, S3 read-only from your JSON, SNS permissions)
+
+Creates an SNS topic for alerts
+
+Creates a Lambda (container image) wired to that image
+
+Adds a CloudWatch/EventBridge schedule (e.g., daily)
+
+Grants EventBridge permission to invoke the Lambda
+
+cd terraform
+terraform init
+terraform apply -target=aws_ecr_repository.repo -auto-approve
+
+# Build & push your Docker image to the repo Terraform just created
+ECR=$(terraform output -raw ecr_repository_url)
+aws ecr get-login-password --region $(terraform output -raw region 2>/dev/null || echo us-east-1) \
+  | docker login --username AWS --password-stdin "$ECR"
+docker build -t ${ECR}:latest ..
+docker push ${ECR}:latest
+
+
+terraform apply -auto-approve
