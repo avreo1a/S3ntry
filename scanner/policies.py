@@ -12,43 +12,87 @@ from notify.AmazonSNS import SNSNotifier #TODO Not sure if I will use this howev
 #Nevermind Python doesnt have typesafe so these are "Type Hints", mind you theyre not enforced and the runtime doesnt care
 #none of this is tested btw
 
-def _principal_is_public(principal: Any) -> bool:
-    if principal == "*" and isinstance(principal, dict) and principal.get("AWS") == "*" and isinstance(principal, list) and any(p == "*" for p in principal):
+#Hello Future me some of the code is being revised (8/31/25)
+
+PUBLIC_GROUP_URIS = {
+    "http://acs.amazonaws.com/groups/global/AllUsers",
+    "http://acs.amazonaws.com/groups/global/AuthenticatedUsers",
+}
+
+def listify(x: Any) -> List[Any]:
+    #I just need this to return a list
+    if x is None:
+        return []
+    return x if isinstance(x, list) else [x]
+
+
+
+# Function is to understand if principal == Public ???
+def principalIsPublic(principal: Any) -> bool:
+    if principal == "*":
         return True
-    else:
-        return False
+    
+    if isinstance(principal, list):
+        #just turning principal into a list
+        return any(principalIsPublic(p) for p in principal)
+    
+    if isinstance(principal, dict):
+        #keys can be AWS / Service etc
+        for value in principal.values():
+            if principalIsPublic(value):
+                return True
+            if isinstance(value, list) and any(v == "*" for v in value):
+                return True
+    
 
-def _listify(x: Any) -> List[str]:
-    for x in x:
-        if isinstance(x, str):
-            return [x]
-        elif isinstance(x, list):
-            return x
+def getBuckets(s3) -> List[str]:
+    return [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
 
 
-def _get_buckets(s3) -> List[str]:
-    listBuckets = []
-    buckets = [b["Name"] for b in s3.list_buckets()["Buckets"]]
-    for bucket in buckets:
-        listBuckets.append(bucket)
-    return listBuckets
+def readPublicAccessBlock(s3, bucket: str) -> Dict[str, bool]:
+    # return a dict with  the for PAB flags. if theyre missing default to a false
+    #Cfg = BPA IPA BPP RPB
 
-
-def _read_public_access_block(s3, bucket: str) -> Dict[str, bool]:
-    """
-    Return dict with the four PAB flags. If missing or error, default to False.
-      {
-        "BlockPublicAcls": bool,
-        "IgnorePublicAcls": bool,
-        "BlockPublicPolicy": bool,
-        "RestrictPublicBuckets": bool
-      }
-    """
-    cfg = {"BlockPublicAcls": False, "IgnorePublicAcls": False,
-           "BlockPublicPolicy": False, "RestrictPublicBuckets": False}
-    # TODO: call get_public_access_block and populate cfg
-    # TODO: handle NoSuchPublicAccessBlockConfiguration via ClientError
+    cfg = {
+        "BlockPublicAcls": False,
+        "IgnorePublicAcls": False,
+        "BlockPublicPolicy": False,
+        "RestrictPublicBuckets": False,
+    }
+    try:
+        resp = s3.get_public_access_block(Bucket=bucket)
+        cfg.update(resp.get("PublicAccessBlockConfiguration", {}))
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("NoSuchPublicAccessBlockConfiguration", "NoSuchPublicAccessBlock"):
+            logging.info(f"No Public Access Block for {bucket}.")
+        elif code in ("NoSuchBucket", "AccessDenied"):
+            logging.warning(f"{code} reading PAB for {bucket}.")
+        else:
+            logging.error(f"Error reading PAB for {bucket}: {e}")
+            raise
     return cfg
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def _read_bucket_policy_status(s3, bucket: str) -> bool:
@@ -84,12 +128,6 @@ def _scan_bucket_policy(s3, bucket: str) -> Dict[str, Any]:
       }
     """
     result = {"policy_present": False, "public_allow": False, "public_allow_details": []}
-    # TODO:
-    #  - get_bucket_policy
-    #  - json.loads
-    #  - normalize Statement to list
-    #  - for each Allow stmt with public principal, collect actions/resources/condition flag
-    #  - set flags accordingly; handle NoSuchBucketPolicy via ClientError
     try:
         response = s3.get_bucket_policy(Bucket=bucket)
         
